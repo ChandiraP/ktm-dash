@@ -1,36 +1,85 @@
-/* src/App.css */
-@keyframes blink {
-  0% { opacity: 1; }
-  50% { opacity: 0.1; }
-  100% { opacity: 1; }
-}
-
-.gps-blink {
-  animation: blink 1s infinite;
-}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@900&family=Orbitron:wght@700;900&display=swap');
 
 .theme-transition {
-  transition: background-color 0.4s ease, color 0.4s ease;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 100vh; width: 100vw;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
 }
 
-/* iOS Notch & Home Indicator Fix */
-.safe-top {
+.safe-area-container {
   padding-top: env(safe-area-inset-top);
-}
-.safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-* {
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-  touch-action: manipulation;
-  box-sizing: border-box;
+/* 1. Status Grid */
+.status-grid {
+  display: flex; justify-content: space-around;
+  padding: 10px; background: rgba(0,0,0,0.2);
+}
+.status-box {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.status-box span { font-size: 8px; font-weight: 900; letter-spacing: 1px; }
+.glow { filter: drop-shadow(0 0 5px currentColor); }
+
+/* 2. RPM Section */
+.rpm-section { padding: 20px 25px 0; }
+.rpm-labels {
+  display: flex; justify-content: space-between;
+  font-family: 'Orbitron'; font-size: 14px; font-weight: 900;
+  color: #555; font-style: italic; margin-bottom: 5px;
+}
+.redline-text { color: #ef4444; }
+.rpm-bar-container {
+  height: 35px; background: #111; border-radius: 6px;
+  border: 1px solid #222; overflow: hidden;
+}
+.rpm-fill { height: 100%; transition: width 0.2s ease-out; }
+
+/* 3. Center Cluster */
+.center-cluster {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.gear-display {
+  font-family: 'Orbitron'; font-size: 9rem;
+  line-height: 1; margin-bottom: -30px;
+  font-style: italic; font-weight: 900;
+}
+.speed-digits {
+  font-family: 'Orbitron'; font-size: 12rem;
+  font-weight: 900; font-style: italic; letter-spacing: -8px;
+}
+.speed-unit {
+  font-size: 1.8rem; font-weight: 900; font-style: italic;
+  margin-left: 10px; letter-spacing: 2px;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background-color: black;
+/* 4. Stats & Buttons */
+.stats-container { display: flex; gap: 12px; padding: 0 20px 20px; }
+.stat-box {
+  flex: 1; padding: 15px; border-radius: 15px;
+  border: 1px solid; display: flex; justify-content: space-between; align-items: center;
+}
+.stat-label { font-size: 10px; font-weight: 900; }
+.stat-value { font-size: 1.8rem; font-weight: 900; font-family: 'Orbitron'; }
+
+.controls-container { display: flex; gap: 15px; padding: 0 20px 40px; }
+.btn-ignite {
+  flex: 3; height: 85px; border-radius: 20px; border: none;
+  background: #FF6600; color: white; display: flex;
+  flex-direction: column; align-items: center; justify-content: center;
+  font-weight: 900; gap: 5px; box-shadow: 0 10px 20px rgba(255,102,0,0.3);
+}
+.btn-on { background: #7f1d1d; box-shadow: none; }
+.btn-theme {
+  flex: 1; border-radius: 20px; border: 1px solid;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.footer-info {
+  text-align: center; font-size: 9px; font-weight: 900;
+  letter-spacing: 3px; color: #444; padding-bottom: 10px;
 }

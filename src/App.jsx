@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Zap, Power, RotateCcw, Sparkles, 
+  AlertTriangle, Thermometer, Droplets, CircleDot, Activity,
+  Navigation, Sun, Moon
+} from 'lucide-react';
 import './App.css';
 
 const KTMProDash = () => {
-  // Set default to true so it starts in DARK MODE
   const [on, setOn] = useState(false);
   const [speed, setSpeed] = useState(0);
   const [trip, setTrip] = useState(0);
@@ -11,14 +15,13 @@ const KTMProDash = () => {
   const [diag, setDiag] = useState(false);
   const [diagGear, setDiagGear] = useState('N');
   const [sweepRpm, setSweepRpm] = useState(0);
-  const [gpsStatus, setGpsStatus] = useState("OFFLINE"); 
+  const [gpsStatus, setGpsStatus] = useState("OFFLINE");
   const [accuracy, setAccuracy] = useState(null);
   
   const watchId = useRef(null);
-  const lastPos = useRef(null);
 
   useEffect(() => {
-    const sOdo = localStorage.getItem('ktm_odo_v22');
+    const sOdo = localStorage.getItem('ktm_odo_final');
     if (sOdo) setOdo(parseFloat(sOdo));
   }, []);
 
@@ -30,86 +33,96 @@ const KTMProDash = () => {
       setDiag(true);
       setSweepRpm(100);
       const gearTest = ['N', '1', '2', '3', '4', '5'];
-      gearTest.forEach((g, i) => setTimeout(() => setDiagGear(g), i * 180));
+      gearTest.forEach((g, i) => setTimeout(() => setDiagGear(g), i * 150));
       setTimeout(() => {
-        setSweepRpm(0);
-        setOn(true);
-        setDiag(false);
-        // Start GPS tracking here
-      }, 1300);
+        setSweepRpm(0); setOn(true); setDiag(false);
+        // GPS start logic goes here
+      }, 1200);
     }
   };
 
-  // Theme Logic
   const isDarkMode = isHighBeam;
   const theme = {
-    bg: isDarkMode ? '#000000' : '#FFFFFF',
-    card: isDarkMode ? '#111111' : '#F3F4F6',
-    text: isDarkMode ? '#FFFFFF' : '#000000',
-    border: isDarkMode ? '#222222' : '#E5E7EB',
-    dimText: isDarkMode ? '#666666' : '#9CA3AF'
+    bg: isDarkMode ? '#000' : '#f4f4f5',
+    card: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+    text: isDarkMode ? '#fff' : '#000',
+    border: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+    accent: '#FF6600'
   };
 
+  const displayRpm = sweepRpm > 0 ? sweepRpm : (on ? (speed % 40) * 2.5 + 15 : 0);
+
   return (
-    <div className="theme-transition safe-top safe-bottom" 
-         style={{ 
-           backgroundColor: theme.bg, 
-           color: theme.text, 
-           height: '100vh', 
-           width: '100vw',
-           display: 'flex', 
-           flexDirection: 'column',
-           transition: 'all 0.3s ease' 
-         }}>
+    <div className={`theme-transition safe-area-container ${isDarkMode ? 'dark-ui' : 'light-ui'}`} 
+         style={{ backgroundColor: theme.bg, color: theme.text }}>
       
-      {/* HEADER SECTION */}
-      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '10px 0', backgroundColor: theme.card, borderBottom: `1px solid ${theme.border}` }}>
-        <StatusIcon active={on} color="#22c55e" label="GPS" d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
-        <StatusIcon active={isHighBeam} color="#2563eb" label="BEAM" d="M2 12h8M2 8h8M2 16h8M14 5c4 0 8 3 8 7s-4 7-8 7V5z" />
-        <StatusIcon active={on && speed < 1} color="#22c55e" label="NEUTRAL" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
-        <StatusIcon active={on} color="#ef4444" label="OIL" d="M12 18h.01M7 21h10M9 3h6l-1 15H10L9 3z" />
+      {/* 1. STATUS BAR */}
+      <div className="status-grid">
+        <StatusBox active={on} color="#22c55e" label="GPS" Icon={Navigation} />
+        <StatusBox active={isHighBeam} color="#3b82f6" label="BEAM" Icon={Sun} />
+        <StatusBox active={on && speed < 1} color="#22c55e" label="NEUTRAL" Icon={CircleDot} />
+        <StatusBox active={on} color="#ef4444" label="OIL" Icon={Droplets} />
+        <StatusBox active={diag} color="#f59e0b" label="TEMP" Icon={Thermometer} />
       </div>
 
-      {/* RPM SECTION */}
-      <div style={{ padding: '20px 20px 0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '900', color: theme.dimText, fontStyle: 'italic', marginBottom: '5px' }}>
-          <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span style={{color: '#ef4444'}}>10</span>
+      {/* 2. RPM GAUGE */}
+      <div className="rpm-section">
+        <div className="rpm-labels">
+          {[0,2,4,6,8,10].map(n => <span key={n} className={n === 10 ? 'redline-text' : ''}>{n}</span>)}
         </div>
-        <div style={{ height: '35px', background: isDarkMode ? '#1a1a1a' : '#DDD', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${theme.border}` }}>
-          <div style={{ width: `${sweepRpm || (on ? (speed % 40) * 2.5 + 15 : 0)}%`, height: '100%', background: 'linear-gradient(90deg, #FF6600, #FFCC00)', transition: 'width 0.2s' }} />
+        <div className="rpm-bar-container" style={{ borderColor: theme.border }}>
+          <div className="rpm-fill" style={{ 
+            width: `${displayRpm}%`,
+            background: displayRpm > 85 ? '#ef4444' : `linear-gradient(90deg, ${theme.accent}, #ffcc00)`
+          }} />
         </div>
       </div>
 
-      {/* CENTER DISPLAY */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontSize: '8rem', fontWeight: '900', color: '#22c55e', fontStyle: 'italic', lineHeight: 1, marginBottom: '-20px' }}>
+      {/* 3. CENTER DISPLAY */}
+      <div className="center-cluster">
+        <div className="gear-display" style={{ color: (diag ? diagGear : (speed < 1 ? 'N' : '1')) === 'N' ? '#22c55e' : theme.accent }}>
           {diag ? diagGear : (on ? (speed < 1 ? 'N' : '1') : '-')}
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline' }}>
-          <span style={{ fontSize: '12rem', fontWeight: '900', fontStyle: 'italic' }}>{diag ? '188' : Math.floor(speed)}</span>
-          <span style={{ fontSize: '2rem', fontWeight: '900', color: '#FF6600', fontStyle: 'italic', marginLeft: '10px' }}>KM/H</span>
+        <div className="speed-display">
+          <span className="speed-digits">{diag ? '188' : Math.floor(speed)}</span>
+          <span className="speed-unit" style={{ color: theme.accent }}>KM/H</span>
         </div>
       </div>
 
-      {/* FOOTER CONTROLS */}
-      <div style={{ padding: '0 20px 30px', display: 'flex', gap: '15px' }}>
-        <button onClick={handleIgnition} style={{ flex: 2, height: '80px', borderRadius: '20px', border: 'none', background: on ? '#7f1d1d' : '#FF6600', color: '#fff', fontWeight: '900', fontSize: '1.5rem' }}>
-          {on ? 'KILL ENGINE' : 'IGNITION'}
+      {/* 4. STATS ROW */}
+      <div className="stats-container">
+        <div className="stat-box" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
+          <span className="stat-label">TRIP</span>
+          <span className="stat-value">{trip.toFixed(1)}</span>
+        </div>
+        <div className="stat-box" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
+          <span className="stat-label" style={{ color: theme.accent }}>ODO</span>
+          <span className="stat-value" style={{ color: theme.accent }}>{Math.floor(odo)}</span>
+        </div>
+      </div>
+
+      {/* 5. PRO CONTROLS */}
+      <div className="controls-container">
+        <button onClick={handleIgnition} className={`btn-ignite ${on ? 'btn-on' : ''}`}>
+          {on ? <Activity size={32} /> : <Power size={32} />}
+          <span>{on ? 'KILL ENGINE' : 'IGNITION'}</span>
         </button>
-        <button onClick={() => setIsHighBeam(!isHighBeam)} style={{ flex: 1, height: '80px', borderRadius: '20px', border: `3px solid ${isHighBeam ? '#2563eb' : theme.border}`, background: isHighBeam ? '#1e3a8a' : theme.card, color: isHighBeam ? '#fff' : theme.text }}>
-           <span style={{fontWeight: '900'}}>{isHighBeam ? 'DARK' : 'LIGHT'}</span>
+        <button onClick={() => setIsHighBeam(!isHighBeam)} className="btn-theme" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
+          {isHighBeam ? <Moon color="#3b82f6" /> : <Sun color="#f59e0b" />}
         </button>
+      </div>
+
+      <div className="footer-info">
+        ACCURACY: {accuracy || '0'}M | READY TO RACE
       </div>
     </div>
   );
 };
 
-const StatusIcon = ({ active, color, d, label }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? color : "#333"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d={d} />
-    </svg>
-    <span style={{ fontSize: '7px', fontWeight: '900', color: active ? color : '#333' }}>{label}</span>
+const StatusBox = ({ active, color, label, Icon }) => (
+  <div className="status-box">
+    <Icon size={20} color={active ? color : '#333'} className={active ? 'glow' : ''} />
+    <span style={{ color: active ? color : '#333' }}>{label}</span>
   </div>
 );
 
