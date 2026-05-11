@@ -18,7 +18,7 @@ const KTMProDash = () => {
   const watchId = useRef(null);
   const lastPos = useRef(null);
 
-  // GEAR LOGIC (Standard KTM 135cc Shift Points)
+  // --- GEAR LOGIC (EXACT SHIFT POINTS) ---
   const gear = useMemo(() => {
     if (!on && !diag) return '-';
     if (speed < 1.5) return 'N';
@@ -29,32 +29,46 @@ const KTMProDash = () => {
     return '5';
   }, [speed, on, diag]);
 
-  // NEW RPM LOGIC - MATCHING YOUR INSTRUCTIONS
+  // --- FIXED RPM ENGINE ---
   const calculateLiveRPM = () => {
     if (diag) return diagRpm;
     if (!on) return 0;
-    if (speed < 1.5) return 1500 + (Math.random() * 40); // Idle 1500
+    if (speed < 1.5) return 1500 + (Math.random() * 50); // Idle flicker
 
-    let targetRpm = 1500;
+    let calculatedRpm = 1500;
 
-    // Logic based on your shift data
-    if (gear === '1') targetRpm = 1500 + (speed * 450); // Hits 6000 at 10kmh
-    else if (gear === '2') targetRpm = 2000 + ((speed - 10) * 500); // 1-2 shift 6000
-    else if (gear === '3') targetRpm = 2000 + ((speed - 18) * 250); // 3 running ~3000
-    else if (gear === '4') targetRpm = 3000 + ((speed - 22) * 375); // 4 shift 6000
+    // 1st Gear: 0 to 10 km/h -> RPM 1500 to 6000
+    if (gear === '1') {
+      calculatedRpm = 1500 + (speed * 450); 
+    } 
+    // 2nd Gear: 10 to 18 km/h -> RPM 2000 to 6000
+    else if (gear === '2') {
+      calculatedRpm = 2000 + ((speed - 10) * 500);
+    }
+    // 3rd Gear: 18 to 22 km/h -> RPM 2000 to 4000 (Running at 3000)
+    else if (gear === '3') {
+      calculatedRpm = 2000 + ((speed - 18) * 500);
+    }
+    // 4th Gear: 22 to 30 km/h -> RPM 3000 to 6000
+    else if (gear === '4') {
+      calculatedRpm = 3000 + ((speed - 22) * 375);
+    }
+    // 5th Gear: 30+ km/h -> Running 4000, Shifts 6500, Redlines 50+
     else if (gear === '5') {
-       if (speed <= 38) {
-         targetRpm = 4000 + ((speed - 30) * 312); // 5 running ~4000, shift 6500
-       } else {
-         targetRpm = 6500 + ((speed - 38) * 150); // Smooth climb to redline past 50kmh
-       }
+      if (speed <= 38) {
+        calculatedRpm = 4000 + ((speed - 30) * 312);
+      } else {
+        // Redline climb: speed 38 to 60 -> RPM 6500 to 10000
+        calculatedRpm = 6500 + ((speed - 38) * 160);
+      }
     }
 
-    return Math.min(targetRpm, 10500); // Caps at 10k range
+    return Math.min(calculatedRpm, 10500);
   };
 
   const rpm = calculateLiveRPM();
 
+  // --- ODO & PERSISTENCE ---
   useEffect(() => {
     const savedOdo = localStorage.getItem('ktm_odo_vfinal_fixed');
     if (savedOdo) setOdo(parseFloat(savedOdo));
@@ -77,11 +91,11 @@ const KTMProDash = () => {
     watchId.current = navigator.geolocation.watchPosition((p) => {
       const { latitude: lat, longitude: lon, speed: s, accuracy: acc } = p.coords;
       setGpsStatus(acc < 25 ? "GOOD" : "ERROR");
-      const curSpeed = (s ? s * 3.6 : 0) < 1.8 ? 0 : s * 3.6;
+      const curSpeed = (s ? s * 3.6 : 0) < 1.5 ? 0 : s * 3.6;
       setSpeed(curSpeed);
       
-      // FIXED MAX SPEED: Updates live and stays
-      if (curSpeed > maxSpeed) setMaxSpeed(curSpeed);
+      // PERSISTENT MAX SPEED
+      setMaxSpeed(prev => curSpeed > prev ? curSpeed : prev);
 
       if (lastPos.current && curSpeed > 2) {
         const d = getDist(lastPos.current.lat, lastPos.current.lon, lat, lon);
@@ -103,17 +117,10 @@ const KTMProDash = () => {
       if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
       setOn(false); setSpeed(0); setWarningsActive(false); setGpsStatus("OFFLINE");
     } else {
-      setDiag(true);
-      setWarningsActive(true); 
-      setDiagRpm(10000); // Startup Sweep to 10
-      ['1', '2', '3', '4', '5', 'N'].forEach((g, i) => {
-        setTimeout(() => setDiagGear(g), i * 180);
-      });
-      
+      setDiag(true); setWarningsActive(true); setDiagRpm(10000);
+      ['1', '2', '3', '4', '5', 'N'].forEach((g, i) => setTimeout(() => setDiagGear(g), i * 180));
       setTimeout(() => {
-        setDiagRpm(0);
-        setOn(true); 
-        setDiag(false);
+        setDiagRpm(0); setOn(true); setDiag(false);
         startTracking();
         setTimeout(() => setWarningsActive(false), 10000);
       }, 1300);
@@ -199,10 +206,7 @@ const KTMProDash = () => {
         </div>
 
         <div className="controls">
-          <button 
-            onClick={toggleEngine} 
-            className={`btn-ignite ${on ? 'kill-mode' : 'ignite-mode'}`}
-          >
+          <button onClick={toggleEngine} className={`btn-ignite ${on ? 'kill-mode' : 'ignite-mode'}`}>
             {on ? 'KILL ENGINE' : 'IGNITION'}
           </button>
           <button onClick={() => setIsHighBeam(!isHighBeam)} className="btn-mode">
