@@ -1,228 +1,196 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './App.css';
 
-const KTMProDash = () => {
-  const [bootStage, setBootStage] = useState('READY');
+const KTMProMaster = () => {
+  const [bootStage, setBootStage] = useState('READY'); 
   const [on, setOn] = useState(false);
+  const [isHighBeam, setIsHighBeam] = useState(true);
+  const [diag, setDiag] = useState(false);
+  const [warningsActive, setWarningsActive] = useState(true);
+  
   const [speed, setSpeed] = useState(0);
-  const [maxSpeed, setMaxSpeed] = useState(0); 
+  const [maxSpeed, setMaxSpeed] = useState(0);
   const [trip, setTrip] = useState(0);
   const [odo, setOdo] = useState(0);
-  const [isHighBeam, setIsHighBeam] = useState(true); 
-  const [warningsActive, setWarningsActive] = useState(false);
+  const [virtualRpm, setVirtualRpm] = useState(0);
   const [diagGear, setDiagGear] = useState('N');
-  const [diag, setDiag] = useState(false);
-  const [gpsStatus, setGpsStatus] = useState("OFFLINE");
-  const [diagRpm, setDiagRpm] = useState(0);
-  
+  const [gpsLocked, setGpsLocked] = useState(false);
+  const [diagSpeed, setDiagSpeed] = useState(0);
+
   const watchId = useRef(null);
   const lastPos = useRef(null);
+  const lastSpeed = useRef(0);
 
-  // --- GEAR LOGIC (EXACT SHIFT POINTS) ---
-  const gear = useMemo(() => {
-    if (!on && !diag) return '-';
-    if (speed < 1.5) return 'N';
-    if (speed <= 10) return '1';
-    if (speed <= 18) return '2';
-    if (speed <= 22) return '3';
-    if (speed <= 30) return '4';
-    return '5';
-  }, [speed, on, diag]);
+  const shifts = { g1: 10, g2: 18, g3: 25, g4: 30, g5: 38 };
 
-  // --- FIXED RPM ENGINE ---
-  const calculateLiveRPM = () => {
-    if (diag) return diagRpm;
-    if (!on) return 0;
-    if (speed < 1.5) return 1500 + (Math.random() * 50); // Idle flicker
-
-    let calculatedRpm = 1500;
-
-    // 1st Gear: 0 to 10 km/h -> RPM 1500 to 6000
-    if (gear === '1') {
-      calculatedRpm = 1500 + (speed * 450); 
-    } 
-    // 2nd Gear: 10 to 18 km/h -> RPM 2000 to 6000
-    else if (gear === '2') {
-      calculatedRpm = 2000 + ((speed - 10) * 500);
-    }
-    // 3rd Gear: 18 to 22 km/h -> RPM 2000 to 4000 (Running at 3000)
-    else if (gear === '3') {
-      calculatedRpm = 2000 + ((speed - 18) * 500);
-    }
-    // 4th Gear: 22 to 30 km/h -> RPM 3000 to 6000
-    else if (gear === '4') {
-      calculatedRpm = 3000 + ((speed - 22) * 375);
-    }
-    // 5th Gear: 30+ km/h -> Running 4000, Shifts 6500, Redlines 50+
-    else if (gear === '5') {
-      if (speed <= 38) {
-        calculatedRpm = 4000 + ((speed - 30) * 312);
-      } else {
-        // Redline climb: speed 38 to 60 -> RPM 6500 to 10000
-        calculatedRpm = 6500 + ((speed - 38) * 160);
-      }
-    }
-
-    return Math.min(calculatedRpm, 10500);
-  };
-
-  const rpm = calculateLiveRPM();
-
-  // --- ODO & PERSISTENCE ---
   useEffect(() => {
-    const savedOdo = localStorage.getItem('ktm_odo_vfinal_fixed');
+    const savedOdo = localStorage.getItem('ktm_final_master_odo');
     if (savedOdo) setOdo(parseFloat(savedOdo));
     setTimeout(() => setBootStage('TO'), 800);
     setTimeout(() => setBootStage('RACE'), 1600);
-    setTimeout(() => setBootStage('WELCOME'), 2400);
-    setTimeout(() => setBootStage('DASH'), 4500);
+    setTimeout(() => setBootStage('DASH'), 2600);
   }, []);
 
-  const getDist = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  useEffect(() => {
+    if (!on && !diag) { setVirtualRpm(0); return; }
+    if (diag) return;
+    const engineLoop = setInterval(() => {
+      setVirtualRpm(prev => {
+        if (speed < 1.5) return 1500 + (Math.random() * 80);
+        let currentGear = 1;
+        if (speed > shifts.g5) currentGear = 5;
+        else if (speed > shifts.g3) currentGear = 4;
+        else if (speed > shifts.g2) currentGear = 3;
+        else if (speed > shifts.g1) currentGear = 2;
+        else currentGear = 1;
+        const gearMultipliers = [0, 750, 500, 380, 310, 240]; 
+        let targetRpm = (speed * gearMultipliers[currentGear]) + 1200;
+        const accel = speed - lastSpeed.current;
+        let loadBonus = accel > 0.1 ? accel * 2200 : accel < -0.1 ? -800 : 0;
+        lastSpeed.current = speed;
+        const finalTarget = Math.min(Math.max(targetRpm + loadBonus, 1500), 10500);
+        return prev + (finalTarget - prev) * 0.25;
+      });
+    }, 80);
+    return () => clearInterval(engineLoop);
+  }, [speed, on, diag]);
+
+  const handleIgnition = () => {
+    if (on || diag) {
+      if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
+      setOn(false); setDiag(false); setSpeed(0); setMaxSpeed(0); setGpsLocked(false); setWarningsActive(true);
+    } else {
+      setDiag(true);
+      setWarningsActive(true);
+      setVirtualRpm(10500);
+      let s = 0;
+      const speedInterval = setInterval(() => {
+        s += 12;
+        if (s >= 188) { setDiagSpeed(188); clearInterval(speedInterval); }
+        else { setDiagSpeed(s); }
+      }, 50);
+      const gearSeq = ['N', '1', '2', '3', '4', '5'];
+      gearSeq.forEach((g, i) => setTimeout(() => setDiagGear(g), i * 400));
+      setTimeout(() => {
+        setDiag(false); setOn(true); setVirtualRpm(1500); setDiagSpeed(0);
+        startTracking();
+        setTimeout(() => setWarningsActive(false), 10000);
+      }, 2500);
+    }
   };
 
   const startTracking = () => {
-    setGpsStatus("SEARCHING");
+    if (!navigator.geolocation) return;
     watchId.current = navigator.geolocation.watchPosition((p) => {
-      const { latitude: lat, longitude: lon, speed: s, accuracy: acc } = p.coords;
-      setGpsStatus(acc < 25 ? "GOOD" : "ERROR");
-      const curSpeed = (s ? s * 3.6 : 0) < 1.5 ? 0 : s * 3.6;
+      const { latitude: lat, longitude: lon, speed: s, accuracy } = p.coords;
+      setGpsLocked(accuracy < 40 && s !== null);
+      const curSpeed = (s ? s * 3.6 : 0) < 1.8 ? 0 : s * 3.6;
       setSpeed(curSpeed);
-      
-      // PERSISTENT MAX SPEED
-      setMaxSpeed(prev => curSpeed > prev ? curSpeed : prev);
-
+      if (curSpeed > maxSpeed) setMaxSpeed(curSpeed);
       if (lastPos.current && curSpeed > 2) {
-        const d = getDist(lastPos.current.lat, lastPos.current.lon, lat, lon);
+        const R = 6371;
+        const dLat = (lat - lastPos.current.lat) * Math.PI / 180;
+        const dLon = (lon - lastPos.current.lon) * Math.PI / 180;
+        const a = Math.sin(dLat / 2)**2 + Math.cos(lastPos.current.lat*Math.PI/180) * Math.cos(lat*Math.PI/180) * Math.sin(dLon / 2)**2;
+        const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         if (d > 0.0003) {
           setTrip(prev => prev + d);
           setOdo(prev => {
             const next = prev + d;
-            localStorage.setItem('ktm_odo_vfinal_fixed', next);
+            localStorage.setItem('ktm_final_master_odo', next);
             return next;
           });
         }
       }
       lastPos.current = { lat, lon };
-    }, () => setGpsStatus("ERROR"), { enableHighAccuracy: true });
+    }, null, { enableHighAccuracy: true });
   };
 
-  const toggleEngine = () => {
-    if (on) {
-      if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
-      setOn(false); setSpeed(0); setWarningsActive(false); setGpsStatus("OFFLINE");
-    } else {
-      setDiag(true); setWarningsActive(true); setDiagRpm(10000);
-      ['1', '2', '3', '4', '5', 'N'].forEach((g, i) => setTimeout(() => setDiagGear(g), i * 180));
-      setTimeout(() => {
-        setDiagRpm(0); setOn(true); setDiag(false);
-        startTracking();
-        setTimeout(() => setWarningsActive(false), 10000);
-      }, 1300);
-    }
-  };
+  const currentGear = useMemo(() => {
+    if (diag) return diagGear;
+    if (!on) return '-';
+    if (speed < 1.5) return 'N';
+    if (speed > shifts.g5) return '5';
+    if (speed > shifts.g3) return '4';
+    if (speed > shifts.g2) return '3';
+    if (speed > shifts.g1) return '2';
+    return '1';
+  }, [speed, on, diag, diagGear]);
 
   if (bootStage !== 'DASH') {
-    return (
-      <div className="boot-screen">
-        <h1 className={bootStage === 'RACE' ? 'orange-text' : ''}>
-          {bootStage === 'WELCOME' ? 'CHANDIRA' : bootStage}
-        </h1>
-        {bootStage === 'WELCOME' && <p className="blink-fast">READY TO RACE</p>}
-      </div>
-    );
+    return <div className="boot-screen"><h1>{bootStage}</h1></div>;
   }
 
   return (
     <div className={`main-container ${isHighBeam ? 'dark' : 'light'}`}>
       <div className="safe-area">
+        {/* Indicators */}
         <div className="header-bar">
-          <Indicator on={on} color={gpsStatus === "GOOD" ? "#22c55e" : "#ef4444"} label="GPS" blink={on && gpsStatus !== "GOOD"}>
-             <path d="M12 21s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" /><circle cx="12" cy="10" r="3" fill="currentColor"/>
-          </Indicator>
-          <Indicator on={isHighBeam} color="#2563eb" label="BEAM">
-             <path d="M2 12h8M2 8h8M2 16h8M14 5c4 0 8 3 8 7s-4 7-8 7V5z" />
-          </Indicator>
-          <Indicator on={on && gear === 'N'} color="#22c55e" label="NEUTRAL">
-             <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
-          </Indicator>
-          <Indicator on={on && warningsActive} color="#ef4444" label="OIL">
-             <path d="M12 18h.01M7 21h10M9 3h6l-1 15H10L9 3z" />
-          </Indicator>
-          <Indicator on={on && warningsActive} color="#f59e0b" label="ENGINE">
-             <path d="M2 9v6h2v2h14v-2h2V9h-2V7H4v2H2zm14 2h-2v2h2v-2z" />
-          </Indicator>
-          <Indicator on={on} color="#fbbf24" label="ABS" blink={speed > 2}>
-             <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 8v4" />
-          </Indicator>
+          <div className={`ind-item ${(on || diag) ? 'active' : ''} ${!gpsLocked && on ? 'flash' : ''}`} style={{ color: (on || diag) ? (gpsLocked ? "#22c55e" : "#ef4444") : "#1a1a1a" }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="1.5" fill="currentColor" /></svg>
+            <span>GPS</span>
+          </div>
+          <Indicator on={isHighBeam} color="#2563eb" label="BEAM" d="M2 12h8M2 8h8M2 16h8M14 5c4 0 8 3 8 7s-4 7-8 7V5z" />
+          <Indicator on={(on || diag) && currentGear === 'N'} color="#22c55e" label="NEUTRAL" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
+          <Indicator on={diag || (on && warningsActive)} color="#ef4444" label="OIL" d="M12 18h.01M7 21h10M9 3h6l-1 15H10L9 3z" />
+          <Indicator on={diag || (on && warningsActive)} color="#f59e0b" label="ENGINE" d="M2 9v6h2v2h14v-2h2V9h-2V7H4v2H2zm14 2h-2v2h2v-2z" />
+          <Indicator on={on || diag} color="#fbbf24" label="ABS" blink={on && speed > 2} d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 8v4" />
         </div>
 
-        <div className="rpm-section">
-          <div className="rpm-labels">
-            <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span className="red">10</span>
-          </div>
+        {/* RPM Bar with Max Speed positioned below the '10' */}
+        <div className="rpm-container">
+          <div className="rpm-scale"><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span className="red">10</span></div>
           <div className="rpm-track">
-            <div className="rpm-fill" style={{ width: `${Math.min((rpm / 10000) * 100, 100)}%` }}></div>
+            <div className="rpm-fill" style={{ width: `${(virtualRpm / 10000) * 100}%` }}></div>
           </div>
-        </div>
-
-        <div className="display-center">
-          <div className="gear-container">
-            <div className={`gear-text ${gear === 'N' ? 'green-gear' : 'orange-gear'}`}>
-              {diag ? diagGear : gear}
+          <div className="max-badge-wrap">
+            <div className="orange-max-badge">
+              <span className="max-lbl">MAX</span>
+              <span className="max-val">{Math.floor(maxSpeed)}</span>
             </div>
-            {(on || diag) && (
-              <div className="max-speed-small">
-                <span className="label">MAX</span>
-                <span className="val">{Math.floor(maxSpeed)}</span>
-              </div>
-            )}
-          </div>
-          <div className="speed-row">
-            <span className={`speed-num ${rpm > 9500 ? 'vib' : ''}`}>
-              {!on && !diag ? '-' : (diag ? '188' : Math.floor(speed))}
-            </span>
-            <span className="kmh-unit">KM/H</span>
           </div>
         </div>
 
+        {/* Center Display */}
+        <div className="center-unit">
+          <div className={`gear-val ${currentGear === 'N' ? 'green' : 'orange'}`}>{currentGear}</div>
+          <div className="speed-row">
+            <span className={`speed-num ${!on && !diag ? 'off' : ''} ${virtualRpm > 9200 ? 'vibrate' : ''}`}>
+              {diag ? diagSpeed.toString().padStart(2, '0') : Math.floor(speed)}
+            </span>
+            <span className="unit-label">KM/H</span>
+          </div>
+        </div>
+
+        {/* Stats Section */}
         <div className="stats-row">
           <div className="stat-card">
-            <span className="label">TRIP</span>
-            <span className="val">{trip.toFixed(1)}</span>
+            <label>TRIP</label>
+            <div className="val">{trip.toFixed(1)} <small>KM</small></div>
           </div>
-          <div className="stat-card">
-            <span className="label orange-text">ODO</span>
-            <div className="odo-inner">
-               <span className="val orange-text">{Math.floor(odo)}</span>
-               <div className="odo-icon">/</div>
-            </div>
+          <div className="stat-card highlight">
+            <label>ODO</label>
+            <div className="val">{Math.floor(odo)} <small>KM</small></div>
           </div>
         </div>
 
-        <div className="controls">
-          <button onClick={toggleEngine} className={`btn-ignite ${on ? 'kill-mode' : 'ignite-mode'}`}>
+        {/* Bottom Buttons */}
+        <div className="footer-controls">
+          <button onClick={handleIgnition} className={`btn-ignite ${on ? 'kill' : ''}`}>
             {on ? 'KILL ENGINE' : 'IGNITION'}
           </button>
-          <button onClick={() => setIsHighBeam(!isHighBeam)} className="btn-mode">
-            {isHighBeam ? 'DARK' : 'LIGHT'}
-          </button>
+          <button onClick={() => setIsHighBeam(!isHighBeam)} className="btn-mode">{isHighBeam ? 'DARK' : 'LIGHT'}</button>
         </div>
       </div>
     </div>
   );
 };
 
-const Indicator = ({ on, color, label, children, blink }) => (
-  <div className={`icon-group ${on ? 'active' : ''} ${blink ? 'blink' : ''}`} style={{ color: on ? color : '#222' }}>
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
+const Indicator = ({ on, color, label, d, blink }) => (
+  <div className={`ind-item ${on ? 'active' : ''} ${blink ? 'flash' : ''}`} style={{ color: on ? color : '#1a1a1a' }}>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg>
     <span>{label}</span>
   </div>
 );
 
-export default KTMProDash;
+export default KTMProMaster;
