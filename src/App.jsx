@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Zap, Power, RotateCcw, Sparkles, 
-  AlertTriangle, Thermometer, Droplets, CircleDot, Activity,
-  Navigation, Sun, Moon
-} from 'lucide-react';
 import './App.css';
 
 const KTMProDash = () => {
+  const [bootStage, setBootStage] = useState('READY');
   const [on, setOn] = useState(false);
   const [speed, setSpeed] = useState(0);
   const [trip, setTrip] = useState(0);
@@ -15,114 +11,150 @@ const KTMProDash = () => {
   const [diag, setDiag] = useState(false);
   const [diagGear, setDiagGear] = useState('N');
   const [sweepRpm, setSweepRpm] = useState(0);
-  const [gpsStatus, setGpsStatus] = useState("OFFLINE");
-  const [accuracy, setAccuracy] = useState(null);
+  const [gpsStatus, setGpsStatus] = useState("OFFLINE"); 
+  const [warningsActive, setWarningsActive] = useState(true);
   
   const watchId = useRef(null);
 
   useEffect(() => {
-    const sOdo = localStorage.getItem('ktm_odo_final');
+    setTimeout(() => setBootStage('TO'), 800);
+    setTimeout(() => setBootStage('RACE'), 1600);
+    setTimeout(() => setBootStage('WELCOME'), 2400);
+    setTimeout(() => setBootStage('DASH'), 4000);
+    
+    const sOdo = localStorage.getItem('ktm_odo_vfinal');
     if (sOdo) setOdo(parseFloat(sOdo));
   }, []);
+
+  const startTracking = () => {
+    setGpsStatus("SEARCHING");
+    watchId.current = navigator.geolocation.watchPosition((p) => {
+      const { speed: s, accuracy: acc } = p.coords;
+      // GOOD = Solid Green | ERROR/SEARCHING = Blinking Red
+      setGpsStatus(acc < 25 ? "GOOD" : "ERROR");
+      const cur = (s ? s * 3.6 : 0) < 2 ? 0 : s * 3.6;
+      setSpeed(cur);
+      
+      if (cur > 2) {
+        setTrip(v => v + 0.001);
+        setOdo(v => {
+          const up = v + 0.001;
+          localStorage.setItem('ktm_odo_vfinal', up);
+          return up;
+        });
+      }
+    }, null, { enableHighAccuracy: true });
+  };
 
   const handleIgnition = () => {
     if (on) {
       navigator.geolocation.clearWatch(watchId.current);
-      setOn(false); setSpeed(0); setSweepRpm(0); setGpsStatus("OFFLINE");
+      setOn(false); setSpeed(0); setWarningsActive(true);
     } else {
       setDiag(true);
       setSweepRpm(100);
-      const gearTest = ['N', '1', '2', '3', '4', '5'];
-      gearTest.forEach((g, i) => setTimeout(() => setDiagGear(g), i * 150));
+      ['N', '1', '2', '3', '4', '5'].forEach((g, i) => setTimeout(() => setDiagGear(g), i * 150));
+      
       setTimeout(() => {
         setSweepRpm(0); setOn(true); setDiag(false);
-        // GPS start logic goes here
+        startTracking();
+        setTimeout(() => setWarningsActive(false), 10000);
       }, 1200);
     }
   };
 
-  const isDarkMode = isHighBeam;
-  const theme = {
-    bg: isDarkMode ? '#000' : '#f4f4f5',
-    card: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-    text: isDarkMode ? '#fff' : '#000',
-    border: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-    accent: '#FF6600'
-  };
+  if (bootStage !== 'DASH') {
+    return (
+      <div className="boot-container">
+        <div className="boot-text" style={{ color: bootStage === 'RACE' ? 'var(--ktm-orange)' : 'white' }}>
+          {bootStage === 'WELCOME' ? 'CHANDIRA' : bootStage}
+        </div>
+        {bootStage === 'WELCOME' && <div className="welcome-sub">READY TO RACE</div>}
+      </div>
+    );
+  }
 
-  const displayRpm = sweepRpm > 0 ? sweepRpm : (on ? (speed % 40) * 2.5 + 15 : 0);
+  const isMoving = speed > 2;
+  const gearDisplay = !on ? '-' : (!isMoving ? 'N' : Math.ceil(speed / 35));
+  // Shows 0 when idle
+  const speedDisplay = !on ? '-' : Math.floor(speed);
 
   return (
-    <div className={`theme-transition safe-area-container ${isDarkMode ? 'dark-ui' : 'light-ui'}`} 
-         style={{ backgroundColor: theme.bg, color: theme.text }}>
+    <div className="theme-transition safe-top safe-bottom main-layout" style={{ backgroundColor: isHighBeam ? '#000' : '#f0f2f5', color: isHighBeam ? '#fff' : '#000' }}>
       
-      {/* 1. STATUS BAR */}
-      <div className="status-grid">
-        <StatusBox active={on} color="#22c55e" label="GPS" Icon={Navigation} />
-        <StatusBox active={isHighBeam} color="#3b82f6" label="BEAM" Icon={Sun} />
-        <StatusBox active={on && speed < 1} color="#22c55e" label="NEUTRAL" Icon={CircleDot} />
-        <StatusBox active={on} color="#ef4444" label="OIL" Icon={Droplets} />
-        <StatusBox active={diag} color="#f59e0b" label="TEMP" Icon={Thermometer} />
+      <div className="header-bar" style={{ backgroundColor: isHighBeam ? '#111' : '#fff' }}>
+        {/* GPS Icon WITH DOT - Blinks only when ERROR */}
+        <div className="header-icon-group">
+          <svg 
+            width="22" 
+            height="22" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke={on ? (gpsStatus === "GOOD" ? "#22c55e" : "#ef4444") : "#222"} 
+            strokeWidth="2.5"
+            className={on && gpsStatus !== "GOOD" ? "gps-blink" : ""}
+          >
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+            <circle cx="12" cy="10" r="1.5" fill={on ? (gpsStatus === "GOOD" ? "#22c55e" : "#ef4444") : "none"} />
+          </svg>
+          <span style={{ color: on ? (gpsStatus === "GOOD" ? "#22c55e" : "#ef4444") : "#222" }}>GPS</span>
+        </div>
+        
+        <HeaderIcon active={diag || isHighBeam} color="#2563eb" label="BEAM" d="M2 12h8M2 8h8M2 16h8M14 5c4 0 8 3 8 7s-4 7-8 7V5z" />
+        <HeaderIcon active={diag || (on && !isMoving)} color="#22c55e" label="NEUTRAL" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
+        <HeaderIcon active={diag || (on && warningsActive)} color="#ef4444" label="OIL" d="M12 18h.01M7 21h10M9 3h6l-1 15H10L9 3z" />
+        <HeaderIcon active={diag || (on && warningsActive)} color="#f59e0b" label="ENGINE" d="M2 9v6h2v2h14v-2h2V9h-2V7H4v2H2zm14 2h-2v2h2v-2z" />
+        <HeaderIcon active={diag || (on && !isMoving)} color="#fbbf24" label="ABS" d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 8v4" />
       </div>
 
-      {/* 2. RPM GAUGE */}
-      <div className="rpm-section">
+      <div className="rpm-container">
         <div className="rpm-labels">
-          {[0,2,4,6,8,10].map(n => <span key={n} className={n === 10 ? 'redline-text' : ''}>{n}</span>)}
+          <span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span style={{color: '#ef4444'}}>10</span>
         </div>
-        <div className="rpm-bar-container" style={{ borderColor: theme.border }}>
-          <div className="rpm-fill" style={{ 
-            width: `${displayRpm}%`,
-            background: displayRpm > 85 ? '#ef4444' : `linear-gradient(90deg, ${theme.accent}, #ffcc00)`
-          }} />
+        <div className="rpm-track">
+          <div className="rpm-fill" style={{ width: `${sweepRpm || (on ? (speed % 40) * 2.5 + 15 : 0)}%` }} />
         </div>
       </div>
 
-      {/* 3. CENTER DISPLAY */}
-      <div className="center-cluster">
-        <div className="gear-display" style={{ color: (diag ? diagGear : (speed < 1 ? 'N' : '1')) === 'N' ? '#22c55e' : theme.accent }}>
-          {diag ? diagGear : (on ? (speed < 1 ? 'N' : '1') : '-')}
+      <div className="center-data">
+        <div className="gear-val" style={{ color: gearDisplay === 'N' ? '#22c55e' : '#ff6600' }}>
+          {diag ? diagGear : gearDisplay}
         </div>
-        <div className="speed-display">
-          <span className="speed-digits">{diag ? '188' : Math.floor(speed)}</span>
-          <span className="speed-unit" style={{ color: theme.accent }}>KM/H</span>
+        <div className="speed-row">
+          <span className="speed-val">{diag ? '188' : speedDisplay}</span>
+          <span className="unit-text">KM/H</span>
         </div>
       </div>
 
-      {/* 4. STATS ROW */}
-      <div className="stats-container">
-        <div className="stat-box" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
+      <div className="stats-row">
+        <div className="stat-card">
           <span className="stat-label">TRIP</span>
-          <span className="stat-value">{trip.toFixed(1)}</span>
+          <span className="stat-num">{trip.toFixed(1)}</span>
         </div>
-        <div className="stat-box" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
-          <span className="stat-label" style={{ color: theme.accent }}>ODO</span>
-          <span className="stat-value" style={{ color: theme.accent }}>{Math.floor(odo)}</span>
+        <div className="stat-card">
+          <span className="stat-label" style={{ color: '#ff6600' }}>ODO</span>
+          <span className="stat-num" style={{ color: '#ff6600' }}>{Math.floor(odo)}</span>
         </div>
       </div>
 
-      {/* 5. PRO CONTROLS */}
-      <div className="controls-container">
-        <button onClick={handleIgnition} className={`btn-ignite ${on ? 'btn-on' : ''}`}>
-          {on ? <Activity size={32} /> : <Power size={32} />}
-          <span>{on ? 'KILL ENGINE' : 'IGNITION'}</span>
+      <div className="controls-row">
+        <button onClick={handleIgnition} className="ignite-btn" style={{ background: on ? '#7f1d1d' : '#ff6600' }}>
+          {on ? 'KILL ENGINE' : 'START IGNITION'}
         </button>
-        <button onClick={() => setIsHighBeam(!isHighBeam)} className="btn-theme" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
-          {isHighBeam ? <Moon color="#3b82f6" /> : <Sun color="#f59e0b" />}
+        <button onClick={() => setIsHighBeam(!isHighBeam)} className="beam-btn" style={{ border: `3px solid ${isHighBeam ? '#2563eb' : '#333'}` }}>
+          <span>{isHighBeam ? 'DARK' : 'LIGHT'}</span>
         </button>
-      </div>
-
-      <div className="footer-info">
-        ACCURACY: {accuracy || '0'}M | READY TO RACE
       </div>
     </div>
   );
 };
 
-const StatusBox = ({ active, color, label, Icon }) => (
-  <div className="status-box">
-    <Icon size={20} color={active ? color : '#333'} className={active ? 'glow' : ''} />
-    <span style={{ color: active ? color : '#333' }}>{label}</span>
+const HeaderIcon = ({ active, color, label, d }) => (
+  <div className="header-icon-group">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? color : "#222"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+    <span style={{ color: active ? color : '#222' }}>{label}</span>
   </div>
 );
 
