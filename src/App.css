@@ -2,7 +2,7 @@
 
 body { margin: 0; background: #000; font-family: 'Orbitron', sans-serif; overflow: hidden; color: #fff; }
 
-.main-container { height: 100vh; width: 100vw; display: flex; flex-direction: column; transition: background 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+.main-container { height: 100vh; width: 100vw; display: flex; flex-direction: column; transition: background 0.5s; }
 .dark { background: #000; }
 .light { background: #f0f2f5; color: #000; }
 
@@ -50,21 +50,12 @@ body { margin: 0; background: #000; font-family: 'Orbitron', sans-serif; overflo
 .btn-ignite:active { transform: translateY(4px); box-shadow: 0 0 0 transparent; }
 .btn-ignite.kill { background: #7a1f1f; box-shadow: 0 4px 0 #4a1313; }
 
-.btn-mode { flex: 1; height: 85px; border-radius: 20px; background: #0a0a0a; color: #fff; border: 2px solid #222; cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center; }
-.btn-mode:active { transform: scale(0.9); }
-.btn-mode svg { transition: 0.3s ease; }
-
-.scale-up { animation: scaleUp 0.6s ease-out; }
-@keyframes scaleUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-.slide-in { animation: slideIn 0.5s ease-out; }
-@keyframes slideIn { from { transform: translateX(-30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-.slide-up { animation: slideUp 0.6s ease-out; }
-@keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.small-btns { flex: 1; display: flex; gap: 10px; }
+.icon-btn { flex: 1; height: 85px; border-radius: 20px; background: #0a0a0a; color: #fff; border: 2px solid #222; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; }
+.icon-btn:active { transform: scale(0.9); }
+.btn-reset { border-color: #333; color: #ff6600; }
 
 .flash { animation: flashAnim 0.8s infinite; }
 @keyframes flashAnim { 0%, 100% { opacity: 1; } 50% { opacity: 0.1; } }
-
 .bounce { animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 @keyframes bounceIn { from { transform: scale(0); } to { transform: scale(1); } }
