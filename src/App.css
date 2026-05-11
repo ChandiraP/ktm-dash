@@ -1,3 +1,4 @@
+/* src/App.css */
 @keyframes blink {
   0% { opacity: 1; }
   50% { opacity: 0.1; }
@@ -12,10 +13,19 @@
   transition: background-color 0.4s ease, color 0.4s ease;
 }
 
+/* iOS Notch & Home Indicator Fix */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 * {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   touch-action: manipulation;
+  box-sizing: border-box;
 }
 
 body {
