@@ -18,24 +18,42 @@ const KTMProDash = () => {
   const watchId = useRef(null);
   const lastPos = useRef(null);
 
-  // GEAR LOGIC
-  let gear = 'N';
-  if (!on && !diag) gear = '-';
-  else if (speed > 38) gear = '5';
-  else if (speed > 30) gear = '4';
-  else if (speed > 22) gear = '3';
-  else if (speed > 18) gear = '2';
-  else if (speed > 1) gear = '1';
+  // GEAR LOGIC (Standard KTM 135cc Shift Points)
+  const gear = useMemo(() => {
+    if (!on && !diag) return '-';
+    if (speed < 1.5) return 'N';
+    if (speed <= 10) return '1';
+    if (speed <= 18) return '2';
+    if (speed <= 22) return '3';
+    if (speed <= 30) return '4';
+    return '5';
+  }, [speed, on, diag]);
 
-  // RPM Math for 135cc
-  const rpm = useMemo(() => {
+  // NEW RPM LOGIC - MATCHING YOUR INSTRUCTIONS
+  const calculateLiveRPM = () => {
     if (diag) return diagRpm;
     if (!on) return 0;
-    if (speed < 1.5) return 1500; 
-    const ratios = { '1': 9.5, '2': 6.2, '3': 4.5, '4': 3.2, '5': 2.4, 'N': 0 };
-    const ratio = ratios[gear] || 0;
-    return Math.max(1500, Math.round(speed * ratio * 1.95));
-  }, [speed, gear, on, diag, diagRpm]);
+    if (speed < 1.5) return 1500 + (Math.random() * 40); // Idle 1500
+
+    let targetRpm = 1500;
+
+    // Logic based on your shift data
+    if (gear === '1') targetRpm = 1500 + (speed * 450); // Hits 6000 at 10kmh
+    else if (gear === '2') targetRpm = 2000 + ((speed - 10) * 500); // 1-2 shift 6000
+    else if (gear === '3') targetRpm = 2000 + ((speed - 18) * 250); // 3 running ~3000
+    else if (gear === '4') targetRpm = 3000 + ((speed - 22) * 375); // 4 shift 6000
+    else if (gear === '5') {
+       if (speed <= 38) {
+         targetRpm = 4000 + ((speed - 30) * 312); // 5 running ~4000, shift 6500
+       } else {
+         targetRpm = 6500 + ((speed - 38) * 150); // Smooth climb to redline past 50kmh
+       }
+    }
+
+    return Math.min(targetRpm, 10500); // Caps at 10k range
+  };
+
+  const rpm = calculateLiveRPM();
 
   useEffect(() => {
     const savedOdo = localStorage.getItem('ktm_odo_vfinal_fixed');
@@ -61,7 +79,10 @@ const KTMProDash = () => {
       setGpsStatus(acc < 25 ? "GOOD" : "ERROR");
       const curSpeed = (s ? s * 3.6 : 0) < 1.8 ? 0 : s * 3.6;
       setSpeed(curSpeed);
+      
+      // FIXED MAX SPEED: Updates live and stays
       if (curSpeed > maxSpeed) setMaxSpeed(curSpeed);
+
       if (lastPos.current && curSpeed > 2) {
         const d = getDist(lastPos.current.lat, lastPos.current.lon, lat, lon);
         if (d > 0.0003) {
@@ -79,17 +100,12 @@ const KTMProDash = () => {
 
   const toggleEngine = () => {
     if (on) {
-      // KILL ENGINE
       if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
-      setOn(false);
-      setSpeed(0);
-      setWarningsActive(false);
-      setGpsStatus("OFFLINE");
+      setOn(false); setSpeed(0); setWarningsActive(false); setGpsStatus("OFFLINE");
     } else {
-      // START IGNITION
       setDiag(true);
       setWarningsActive(true); 
-      setDiagRpm(10000);
+      setDiagRpm(10000); // Startup Sweep to 10
       ['1', '2', '3', '4', '5', 'N'].forEach((g, i) => {
         setTimeout(() => setDiagGear(g), i * 180);
       });
@@ -153,7 +169,7 @@ const KTMProDash = () => {
             <div className={`gear-text ${gear === 'N' ? 'green-gear' : 'orange-gear'}`}>
               {diag ? diagGear : gear}
             </div>
-            {on && (
+            {(on || diag) && (
               <div className="max-speed-small">
                 <span className="label">MAX</span>
                 <span className="val">{Math.floor(maxSpeed)}</span>
