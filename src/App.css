@@ -1,0 +1,26 @@
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.1; }
+  100% { opacity: 1; }
+}
+
+.gps-blink {
+  animation: blink 1s infinite;
+}
+
+.theme-transition {
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: black;
+}
