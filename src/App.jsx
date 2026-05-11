@@ -21,7 +21,7 @@ const KTMProMaster = () => {
   const lastPos = useRef(null);
   const lastSpeed = useRef(0);
 
-  const shifts = { g1: 10, g2: 18, g3: 25, g4: 30, g5: 38 };
+  const shifts = { g1: 18, g2: 25, g3: 30, g4: 35 };
 
   useEffect(() => {
     const savedOdo = localStorage.getItem('ktm_final_master_odo');
@@ -36,20 +36,22 @@ const KTMProMaster = () => {
     if (diag) return;
     const engineLoop = setInterval(() => {
       setVirtualRpm(prev => {
-        if (speed < 1.5) return 1500 + (Math.random() * 80);
+        if (speed < 1.5) return 1500 + (Math.random() * 50);
         let currentGear = 1;
-        if (speed > shifts.g5) currentGear = 5;
+        if (speed > shifts.g4) currentGear = 5;
         else if (speed > shifts.g3) currentGear = 4;
         else if (speed > shifts.g2) currentGear = 3;
         else if (speed > shifts.g1) currentGear = 2;
         else currentGear = 1;
-        const gearMultipliers = [0, 750, 500, 380, 310, 240]; 
-        let targetRpm = (speed * gearMultipliers[currentGear]) + 1200;
+
+        const gearMultipliers = [0, 320, 240, 180, 140, 115]; 
+        let targetRpm = (speed * gearMultipliers[currentGear]) + 1500;
         const accel = speed - lastSpeed.current;
-        let loadBonus = accel > 0.1 ? accel * 2200 : accel < -0.1 ? -800 : 0;
+        let loadBonus = accel > 0.1 ? accel * 1200 : accel < -0.1 ? -400 : 0;
         lastSpeed.current = speed;
-        const finalTarget = Math.min(Math.max(targetRpm + loadBonus, 1500), 10500);
-        return prev + (finalTarget - prev) * 0.25;
+
+        const finalTarget = Math.min(Math.max(targetRpm + loadBonus, 1500), 7500);
+        return prev + (finalTarget - prev) * 0.22;
       });
     }, 80);
     return () => clearInterval(engineLoop);
@@ -62,7 +64,7 @@ const KTMProMaster = () => {
     } else {
       setDiag(true);
       setWarningsActive(true);
-      setVirtualRpm(10500);
+      setVirtualRpm(12000); 
       let s = 0;
       const speedInterval = setInterval(() => {
         s += 12;
@@ -84,7 +86,7 @@ const KTMProMaster = () => {
     watchId.current = navigator.geolocation.watchPosition((p) => {
       const { latitude: lat, longitude: lon, speed: s, accuracy } = p.coords;
       setGpsLocked(accuracy < 40 && s !== null);
-      const curSpeed = (s ? s * 3.6 : 0) < 1.8 ? 0 : s * 3.6;
+      const curSpeed = (s ? s * 3.6 : 0) < 1.5 ? 0 : s * 3.6;
       setSpeed(curSpeed);
       if (curSpeed > maxSpeed) setMaxSpeed(curSpeed);
       if (lastPos.current && curSpeed > 2) {
@@ -110,7 +112,7 @@ const KTMProMaster = () => {
     if (diag) return diagGear;
     if (!on) return '-';
     if (speed < 1.5) return 'N';
-    if (speed > shifts.g5) return '5';
+    if (speed > shifts.g4) return '5';
     if (speed > shifts.g3) return '4';
     if (speed > shifts.g2) return '3';
     if (speed > shifts.g1) return '2';
@@ -124,7 +126,6 @@ const KTMProMaster = () => {
   return (
     <div className={`main-container ${isHighBeam ? 'dark' : 'light'}`}>
       <div className="safe-area">
-        {/* Indicators */}
         <div className="header-bar">
           <div className={`ind-item ${(on || diag) ? 'active' : ''} ${!gpsLocked && on ? 'flash' : ''}`} style={{ color: (on || diag) ? (gpsLocked ? "#22c55e" : "#ef4444") : "#1a1a1a" }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="1.5" fill="currentColor" /></svg>
@@ -137,49 +138,50 @@ const KTMProMaster = () => {
           <Indicator on={on || diag} color="#fbbf24" label="ABS" blink={on && speed > 2} d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 8v4" />
         </div>
 
-        {/* RPM Bar with Max Speed positioned below the '10' */}
-        <div className="rpm-container">
-          <div className="rpm-scale"><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span className="red">10</span></div>
+        <div className="rpm-container scale-up">
+          <div className="rpm-scale"><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span className="red">10</span><span className="red">12</span></div>
           <div className="rpm-track">
-            <div className="rpm-fill" style={{ width: `${(virtualRpm / 10000) * 100}%` }}></div>
+            <div className="rpm-fill" style={{ width: `${(virtualRpm / 12000) * 100}%` }}></div>
           </div>
           <div className="max-badge-wrap">
-            <div className="orange-max-badge">
+            <div className="orange-max-badge bounce">
               <span className="max-lbl">MAX</span>
               <span className="max-val">{Math.floor(maxSpeed)}</span>
             </div>
           </div>
         </div>
 
-        {/* Center Display */}
-        <div className="center-unit">
+        <div className="center-unit slide-in">
           <div className={`gear-val ${currentGear === 'N' ? 'green' : 'orange'}`}>{currentGear}</div>
           <div className="speed-row">
-            <span className={`speed-num ${!on && !diag ? 'off' : ''} ${virtualRpm > 9200 ? 'vibrate' : ''}`}>
+            <span className={`speed-num ${!on && !diag ? 'off' : ''}`}>
               {diag ? diagSpeed.toString().padStart(2, '0') : Math.floor(speed)}
             </span>
             <span className="unit-label">KM/H</span>
           </div>
         </div>
 
-        {/* Stats Section */}
-        <div className="stats-row">
-          <div className="stat-card">
-            <label>TRIP</label>
-            <div className="val">{trip.toFixed(1)} <small>KM</small></div>
-          </div>
-          <div className="stat-card highlight">
-            <label>ODO</label>
-            <div className="val">{Math.floor(odo)} <small>KM</small></div>
-          </div>
+        <div className="stats-row slide-up">
+          <div className="stat-card"><label>TRIP</label><div className="val">{trip.toFixed(1)} <small>KM</small></div></div>
+          <div className="stat-card highlight"><label>ODO</label><div className="val">{Math.floor(odo)} <small>KM</small></div></div>
         </div>
 
-        {/* Bottom Buttons */}
         <div className="footer-controls">
           <button onClick={handleIgnition} className={`btn-ignite ${on ? 'kill' : ''}`}>
             {on ? 'KILL ENGINE' : 'IGNITION'}
           </button>
-          <button onClick={() => setIsHighBeam(!isHighBeam)} className="btn-mode">{isHighBeam ? 'DARK' : 'LIGHT'}</button>
+          
+          <button onClick={() => setIsHighBeam(!isHighBeam)} className="btn-mode icon-btn">
+            {isHighBeam ? (
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+              </svg>
+            ) : (
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+            )}
+          </button>
         </div>
       </div>
     </div>
