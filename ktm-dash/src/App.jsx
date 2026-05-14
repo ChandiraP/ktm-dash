@@ -20,7 +20,6 @@ const KTMProMaster = () => {
   const watchId = useRef(null);
   const lastPos = useRef(null);
   const lastSpeed = useRef(0);
-  const maxSpeedRef = useRef(0);
 
   const shifts = { g1: 18, g2: 25, g3: 30, g4: 35 };
 
@@ -93,10 +92,7 @@ const KTMProMaster = () => {
       setGpsLocked(accuracy < 40 && s !== null);
       const curSpeed = (s ? s * 3.6 : 0) < 1.5 ? 0 : s * 3.6;
       setSpeed(curSpeed);
-      if (curSpeed > maxSpeedRef.current) {
-        maxSpeedRef.current = curSpeed;
-        setMaxSpeed(curSpeed);
-      }
+      setMaxSpeed(prevMax => curSpeed > prevMax ? curSpeed : prevMax);
 
       if (lastPos.current && curSpeed > 2) {
         const R = 6371; 
