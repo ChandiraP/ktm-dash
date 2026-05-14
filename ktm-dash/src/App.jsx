@@ -20,6 +20,7 @@ const KTMProMaster = () => {
   const watchId = useRef(null);
   const lastPos = useRef(null);
   const lastSpeed = useRef(0);
+  const maxSpeedRef = useRef(0);
 
   const shifts = { g1: 18, g2: 25, g3: 30, g4: 35 };
 
@@ -64,6 +65,7 @@ const KTMProMaster = () => {
   const handleIgnition = () => {
     if (on || diag) {
       if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
+      maxSpeedRef.current = 0;
       setOn(false); setDiag(false); setSpeed(0); setMaxSpeed(0); setGpsLocked(false); setWarningsActive(true);
     } else {
       setDiag(true); setWarningsActive(true); setVirtualRpm(12000); 
@@ -91,7 +93,10 @@ const KTMProMaster = () => {
       setGpsLocked(accuracy < 40 && s !== null);
       const curSpeed = (s ? s * 3.6 : 0) < 1.5 ? 0 : s * 3.6;
       setSpeed(curSpeed);
-      if (curSpeed > maxSpeed) setMaxSpeed(curSpeed);
+      if (curSpeed > maxSpeedRef.current) {
+        maxSpeedRef.current = curSpeed;
+        setMaxSpeed(curSpeed);
+      }
 
       if (lastPos.current && curSpeed > 2) {
         const R = 6371; 
