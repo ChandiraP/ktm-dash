@@ -89,9 +89,10 @@ const KTMProMaster = () => {
     watchId.current = navigator.geolocation.watchPosition((p) => {
       const { latitude: lat, longitude: lon, speed: s, accuracy } = p.coords;
       setGpsLocked(accuracy < 40 && s !== null);
-      const curSpeed = (s ? s * 3.6 : 0) < 1.5 ? 0 : s * 3.6;
+      const kmh = s ? s * 3.6 : 0;
+      const curSpeed = kmh < 1.5 ? 0 : kmh;
       setSpeed(curSpeed);
-      if (curSpeed > maxSpeed) setMaxSpeed(curSpeed);
+      setMaxSpeed(prevMax => curSpeed > prevMax ? curSpeed : prevMax);
 
       if (lastPos.current && curSpeed > 2) {
         const R = 6371; 
@@ -138,24 +139,15 @@ const KTMProMaster = () => {
   return (
     <div className={`main-container ${isHighBeam ? 'dark' : 'light'}`}>
       <div className="safe-area">
-        <div className="header-bar">
-          <div className={`ind-item ${(on || diag) ? 'active' : ''} ${!gpsLocked && on ? 'flash' : ''}`} style={{ color: (on || diag) ? (gpsLocked ? "#22c55e" : "#ef4444") : "#1a1a1a" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="1.5" fill="currentColor" /></svg>
-            <span>GPS</span>
-          </div>
-          <Indicator on={isHighBeam} color="#2563eb" label="BEAM" d="M2 12h8M2 8h8M2 16h8M14 5c4 0 8 3 8 7s-4 7-8 7V5z" />
-          <Indicator on={(on || diag) && currentGear === 'N'} color="#22c55e" label="NEUTRAL" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
-          <Indicator on={diag || (on && warningsActive)} color="#ef4444" label="OIL" d="M12 18h.01M7 21h10M9 3h6l-1 15H10L9 3z" />
-          <Indicator on={diag || (on && warningsActive)} color="#f59e0b" label="ENGINE" d="M2 9v6h2v2h14v-2h2V9h-2V7H4v2H2zm14 2h-2v2h2v-2z" />
-          <Indicator on={on || diag} color="#fbbf24" label="ABS" blink={on && speed > 2} d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 8v4" />
-        </div>
-
         <div className="rpm-container scale-up">
           <div className="rpm-scale"><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span className="red">10</span><span className="red">12</span></div>
           <div className="rpm-track">
             <div className="rpm-fill" style={{ width: `${(virtualRpm / 12000) * 100}%` }}></div>
           </div>
-          <div className="max-badge-wrap">
+          <div className="rpm-meta">
+            <div className={`gps-dot ${(on || diag) ? (gpsLocked ? 'locked' : 'searching') : ''} ${!gpsLocked && on ? 'flash' : ''}`}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="1.5" fill="currentColor" /></svg>
+            </div>
             <div className="orange-max-badge bounce">
               <span className="max-lbl">MAX</span>
               <span className="max-val">{Math.floor(maxSpeed)}</span>
@@ -196,12 +188,5 @@ const KTMProMaster = () => {
     </div>
   );
 };
-
-const Indicator = ({ on, color, label, d, blink }) => (
-  <div className={`ind-item ${on ? 'active' : ''} ${blink ? 'flash' : ''}`} style={{ color: on ? color : '#1a1a1a' }}>
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg>
-    <span>{label}</span>
-  </div>
-);
 
 export default KTMProMaster;
