@@ -15,6 +15,7 @@ const KTMProMaster = () => {
   const [virtualRpm, setVirtualRpm] = useState(0);
   const [diagGear, setDiagGear] = useState('N');
   const [gpsLocked, setGpsLocked] = useState(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState(null);
   const [diagSpeed, setDiagSpeed] = useState(0);
 
   const watchId = useRef(null);
@@ -64,7 +65,7 @@ const KTMProMaster = () => {
   const handleIgnition = () => {
     if (on || diag) {
       if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
-      setOn(false); setDiag(false); setSpeed(0); setMaxSpeed(0); setGpsLocked(false); setWarningsActive(true);
+      setOn(false); setDiag(false); setSpeed(0); setMaxSpeed(0); setGpsLocked(false); setGpsAccuracy(null); setWarningsActive(true);
     } else {
       setDiag(true); setWarningsActive(true); setVirtualRpm(12000); 
       let s = 0;
@@ -88,6 +89,7 @@ const KTMProMaster = () => {
     if (!navigator.geolocation) return;
     watchId.current = navigator.geolocation.watchPosition((p) => {
       const { latitude: lat, longitude: lon, speed: s, accuracy } = p.coords;
+      setGpsAccuracy(accuracy);
       setGpsLocked(accuracy < 40 && s !== null);
       const kmh = s ? s * 3.6 : 0;
       const curSpeed = kmh < 1.5 ? 0 : kmh;
@@ -145,8 +147,9 @@ const KTMProMaster = () => {
             <div className="rpm-fill" style={{ width: `${(virtualRpm / 12000) * 100}%` }}></div>
           </div>
           <div className="rpm-meta">
-            <div className={`gps-dot ${(on || diag) ? (gpsLocked ? 'locked' : 'searching') : ''} ${!gpsLocked && on ? 'flash' : ''}`}>
+            <div className={`gps-dot ${!on && !diag ? '' : gpsAccuracy === null ? 'searching' : gpsAccuracy <= 20 ? 'locked' : 'weak'} ${!gpsLocked && on ? 'flash' : ''}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="1.5" fill="currentColor" /></svg>
+              <span className="gps-status">{!on && !diag ? 'GPS OFF' : gpsAccuracy === null ? 'SEARCHING' : gpsAccuracy <= 20 ? 'GOOD' : 'WEAK'}</span>
             </div>
             <div className="orange-max-badge bounce">
               <span className="max-lbl">MAX</span>
