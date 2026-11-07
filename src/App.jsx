@@ -55,7 +55,8 @@ const KTMProMaster = () => {
         lastSpeed.current = speed;
 
         const finalTarget = Math.min(Math.max(targetRpm + loadBonus, 1500), 7500);
-        return prev + (finalTarget - prev) * 0.22;
+        const response = finalTarget > prev ? 0.28 : 0.1;
+        return prev + (finalTarget - prev) * response;
       });
     }, 80);
     return () => clearInterval(engineLoop);
