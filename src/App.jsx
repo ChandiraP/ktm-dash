@@ -1,62 +1,52 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import './App.css';
 
+const shifts = { g1: 18, g2: 25, g3: 30, g4: 35 };
+const gearMultipliers = [0, 320, 240, 180, 140, 115];
+
 const KTMProMaster = () => {
-  const [bootStage, setBootStage] = useState('READY'); 
+  const [bootStage, setBootStage] = useState('READY');
   const [on, setOn] = useState(false);
   const [isHighBeam, setIsHighBeam] = useState(true);
   const [diag, setDiag] = useState(false);
-  const [warningsActive, setWarningsActive] = useState(true);
   
   const [speed, setSpeed] = useState(0);
   const [maxSpeed, setMaxSpeed] = useState(0);
   const [trip, setTrip] = useState(0);
-  const [odo, setOdo] = useState(0);
+  const [odo, setOdo] = useState(() => Number(localStorage.getItem('ktm_permanent_odo')) || 0);
   const [virtualRpm, setVirtualRpm] = useState(0);
   const [diagGear, setDiagGear] = useState('N');
-  const [gpsLocked, setGpsLocked] = useState(false);
-  const [gpsAccuracy, setGpsAccuracy] = useState(null);
+  const [gpsStatus, setGpsStatus] = useState('off');
   const [diagSpeed, setDiagSpeed] = useState(0);
 
   const watchId = useRef(null);
   const lastPos = useRef(null);
   const lastSpeed = useRef(0);
 
-  const shifts = { g1: 18, g2: 25, g3: 30, g4: 35 };
-
-  // --- PERSISTENCE: LOAD PERMANENT ODO ---
   useEffect(() => {
-    const savedOdo = localStorage.getItem('ktm_permanent_odo');
-    if (savedOdo) setOdo(parseFloat(savedOdo));
-    
-    setTimeout(() => setBootStage('TO'), 800);
-    setTimeout(() => setBootStage('RACE'), 1600);
-    setTimeout(() => setBootStage('DASH'), 2600);
+    const timers = [
+      setTimeout(() => setBootStage('TO'), 800),
+      setTimeout(() => setBootStage('RACE'), 1600),
+      setTimeout(() => setBootStage('DASH'), 2600),
+    ];
+    return () => timers.forEach(clearTimeout);
   }, []);
 
   // --- ENGINE LOGIC ---
   useEffect(() => {
-    if (!on && !diag) { setVirtualRpm(0); return; }
+    if (!on && !diag) return;
     if (diag) return;
     const engineLoop = setInterval(() => {
       setVirtualRpm(prev => {
         if (speed < 1.5) return 1500 + (Math.random() * 50);
-        let currentGear = 1;
-        if (speed > shifts.g4) currentGear = 5;
-        else if (speed > shifts.g3) currentGear = 4;
-        else if (speed > shifts.g2) currentGear = 3;
-        else if (speed > shifts.g1) currentGear = 2;
-        else currentGear = 1;
-
-        const gearMultipliers = [0, 320, 240, 180, 140, 115]; 
-        let targetRpm = (speed * gearMultipliers[currentGear]) + 1500;
+        const currentGear = speed > shifts.g4 ? 5 : speed > shifts.g3 ? 4 : speed > shifts.g2 ? 3 : speed > shifts.g1 ? 2 : 1;
+        const targetRpm = (speed * gearMultipliers[currentGear]) + 1500;
         const accel = speed - lastSpeed.current;
         let loadBonus = accel > 0.1 ? accel * 1200 : accel < -0.1 ? -400 : 0;
         lastSpeed.current = speed;
 
         const finalTarget = Math.min(Math.max(targetRpm + loadBonus, 1500), 7500);
-        const response = finalTarget > prev ? 0.28 : 0.1;
-        return prev + (finalTarget - prev) * response;
+        return prev + (finalTarget - prev) * 0.22;
       });
     }, 80);
     return () => clearInterval(engineLoop);
@@ -66,9 +56,9 @@ const KTMProMaster = () => {
   const handleIgnition = () => {
     if (on || diag) {
       if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
-      setOn(false); setDiag(false); setSpeed(0); setMaxSpeed(0); setGpsLocked(false); setGpsAccuracy(null); setWarningsActive(true);
+      setOn(false); setDiag(false); setSpeed(0); setMaxSpeed(0); setGpsStatus('off'); setVirtualRpm(0);
     } else {
-      setDiag(true); setWarningsActive(true); setVirtualRpm(12000); 
+      setDiag(true); setVirtualRpm(12000); 
       let s = 0;
       const speedInterval = setInterval(() => {
         s += 12;
@@ -80,41 +70,46 @@ const KTMProMaster = () => {
       setTimeout(() => {
         setDiag(false); setOn(true); setVirtualRpm(1500); setDiagSpeed(0);
         startTracking();
-        setTimeout(() => setWarningsActive(false), 10000);
-      }, 2500);
+              }, 2500);
     }
   };
 
   // --- GPS & ODO SAVING ---
   const startTracking = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) { setGpsStatus('weak'); return; }
+    setGpsStatus('searching');
     watchId.current = navigator.geolocation.watchPosition((p) => {
       const { latitude: lat, longitude: lon, speed: s, accuracy } = p.coords;
-      setGpsAccuracy(accuracy);
-      setGpsLocked(accuracy < 40 && s !== null);
+      const goodFix = accuracy <= 40 && s !== null;
+      setGpsStatus(goodFix ? 'good' : 'weak');
+      if (accuracy > 20) return;
       const kmh = s ? s * 3.6 : 0;
       const curSpeed = kmh < 1.5 ? 0 : kmh;
       setSpeed(curSpeed);
       setMaxSpeed(prevMax => curSpeed > prevMax ? curSpeed : prevMax);
 
       if (lastPos.current && curSpeed > 2) {
-        const R = 6371; 
+        const R = 6371;
         const dLat = (lat - lastPos.current.lat) * Math.PI / 180;
         const dLon = (lon - lastPos.current.lon) * Math.PI / 180;
         const a = Math.sin(dLat / 2)**2 + Math.cos(lastPos.current.lat*Math.PI/180) * Math.cos(lat*Math.PI/180) * Math.sin(dLon / 2)**2;
         const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        
-        if (d > 0.0008) { // Filter out drift
-          setTrip(prev => prev + d);
-          setOdo(prev => {
-            const nextOdo = prev + d;
-            localStorage.setItem('ktm_permanent_odo', nextOdo.toString());
-            return nextOdo;
-          });
+        const elapsed = (p.timestamp - lastPos.current.timestamp) / 1000;
+
+        if (d <= 0.0008 || d > (Math.max(curSpeed, lastPos.current.speed) / 3600) * elapsed * 2) {
+          lastPos.current = { lat, lon, timestamp: p.timestamp, speed: curSpeed };
+          return;
         }
+
+        setTrip(prev => prev + d);
+        setOdo(prev => {
+          const nextOdo = prev + d;
+          localStorage.setItem('ktm_permanent_odo', nextOdo.toString());
+          return nextOdo;
+        });
       }
-      lastPos.current = { lat, lon };
-    }, null, { enableHighAccuracy: true });
+      lastPos.current = { lat, lon, timestamp: p.timestamp, speed: curSpeed };
+    }, () => setGpsStatus('weak'), { enableHighAccuracy: true });
   };
 
   // --- RESET TRIP ONLY ---
@@ -148,9 +143,9 @@ const KTMProMaster = () => {
             <div className="rpm-fill" style={{ width: `${(virtualRpm / 12000) * 100}%` }}></div>
           </div>
           <div className="rpm-meta">
-            <div className={`gps-dot ${!on && !diag ? '' : gpsAccuracy === null ? 'searching' : gpsAccuracy <= 20 ? 'locked' : 'weak'} ${!gpsLocked && on ? 'flash' : ''}`}>
+            <div className={`gps-indicator ${gpsStatus}`} aria-label={`GPS ${gpsStatus}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="1.5" fill="currentColor" /></svg>
-              <span className="gps-status">{!on && !diag ? 'GPS OFF' : gpsAccuracy === null ? 'SEARCHING' : gpsAccuracy <= 20 ? 'GOOD' : 'WEAK'}</span>
+              <span>{gpsStatus === 'good' ? 'GPS GOOD' : gpsStatus === 'weak' ? 'GPS WEAK' : gpsStatus === 'searching' ? 'GPS SEARCHING' : 'GPS OFF'}</span>
             </div>
             <div className="orange-max-badge bounce">
               <span className="max-lbl">MAX</span>

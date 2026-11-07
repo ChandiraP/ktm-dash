@@ -19,11 +19,11 @@ body { margin: 0; background: #000; font-family: 'Orbitron', sans-serif; overflo
 .rpm-fill { height: 100%; background: linear-gradient(90deg, #ff6600, #ffeb3b); transition: width 0.1s linear; box-shadow: 0 0 15px rgba(255, 102, 0, 0.4); }
 
 .rpm-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; }
-.gps-dot { color: #1a1a1a; display: flex; align-items: center; gap: 6px; transition: 0.3s; }
-.gps-dot.locked { color: #22c55e; filter: drop-shadow(0 0 6px #22c55e); }
-.gps-dot.weak { color: #f59e0b; filter: drop-shadow(0 0 6px #f59e0b); }
-.gps-dot.searching { color: #ef4444; filter: drop-shadow(0 0 6px #ef4444); }
-.gps-status { font-size: 9px; font-weight: 900; letter-spacing: 0.5px; }
+.gps-indicator { display: flex; align-items: center; gap: 6px; min-height: 20px; font-size: 9px; font-weight: 900; letter-spacing: .3px; color: #777; transition: color .3s; }
+.gps-indicator.good { color: #22c55e; filter: drop-shadow(0 0 5px #22c55e); }
+.gps-indicator.weak { color: #ef4444; }
+.gps-indicator.searching { color: #ffb020; animation: blink 1s infinite; }
+.gps-indicator.off { color: #777; }
 .orange-max-badge { background: #ff6600; color: #fff; padding: 4px 12px; border-radius: 8px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(255, 102, 0, 0.4); }
 .max-lbl { font-size: 9px; font-weight: 900; }
 .max-val { font-size: 1.5rem; font-weight: 900; font-style: italic; }

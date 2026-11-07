@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">KTM DASH</string>
+    <string name="title_activity_main">KTM DASH</string>
+    <string name="package_name">com.ktmdash.app</string>
+    <string name="custom_url_scheme">com.ktmdash.app</string>
+</resources>

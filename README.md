@@ -1,16 +1,29 @@
-# React + Vite
+# KTM DASH
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+KTM DASH is a React + Vite motorcycle dashboard packaged for Android with Capacitor.
 
-Currently, two official plugins are available:
+## Web app
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```sh
+npm install
+npm run dev
+```
 
-## React Compiler
+Run `npm run lint` and `npm run build` to check and build the web app.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Android APK
 
-## Expanding the ESLint configuration
+Install Android Studio and the Android SDK, then set the SDK path in `android/local.properties` (this machine-specific file is ignored by Git).
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```sh
+npm install
+npm run android:apk
+```
+
+The debug APK is generated at `android/app/build/outputs/apk/debug/app-debug.apk`. It is debug-signed for local testing; a release build requires a separately managed signing key.
+
+## Release notes — v1.0
+
+- Package the KTM DASH web dashboard as a native Android app with the KTM launcher icon.
+- Add GPS status indicators: off, searching, weak, and good.
+- Filter inaccurate GPS fixes and implausible jumps when accumulating trip and odometer distance.
