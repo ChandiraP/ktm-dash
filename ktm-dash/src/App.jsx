@@ -20,6 +20,8 @@ const KTMProMaster = () => {
   const [diagSpeed, setDiagSpeed] = useState(0);
 
   const watchId = useRef(null);
+  const diagTimers = useRef([]);
+  const diagSpeedInterval = useRef(null);
   const lastPos = useRef(null);
   const lastSpeed = useRef(0);
 
@@ -29,7 +31,12 @@ const KTMProMaster = () => {
       setTimeout(() => setBootStage('RACE'), 1600),
       setTimeout(() => setBootStage('DASH'), 2600),
     ];
-    return () => timers.forEach(clearTimeout);
+    return () => {
+      timers.forEach(clearTimeout);
+      clearInterval(diagSpeedInterval.current);
+      diagTimers.current.forEach(clearTimeout);
+      if (watchId.current !== null) navigator.geolocation?.clearWatch(watchId.current);
+    };
   }, []);
 
   // --- ENGINE LOGIC ---
@@ -55,22 +62,28 @@ const KTMProMaster = () => {
   // --- IGNITION & DIAGNOSTICS ---
   const handleIgnition = () => {
     if (on || diag) {
-      if (watchId.current) navigator.geolocation.clearWatch(watchId.current);
-      setOn(false); setDiag(false); setSpeed(0); setMaxSpeed(0); setGpsStatus('off'); setVirtualRpm(0);
+      if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+      clearInterval(diagSpeedInterval.current);
+      diagTimers.current.forEach(clearTimeout);
+      diagTimers.current = [];
+      setOn(false); setDiag(false); setSpeed(0); setMaxSpeed(0); setGpsStatus('off'); setVirtualRpm(0); setDiagSpeed(0);
     } else {
-      setDiag(true); setVirtualRpm(12000); 
+      setDiag(true); setVirtualRpm(12000);
       let s = 0;
-      const speedInterval = setInterval(() => {
+      diagSpeedInterval.current = setInterval(() => {
         s += 12;
-        if (s >= 188) { setDiagSpeed(188); clearInterval(speedInterval); }
+        if (s >= 188) { setDiagSpeed(188); clearInterval(diagSpeedInterval.current); }
         else { setDiagSpeed(s); }
       }, 50);
       const gearSeq = ['N', '1', '2', '3', '4', '5'];
-      gearSeq.forEach((g, i) => setTimeout(() => setDiagGear(g), i * 400));
-      setTimeout(() => {
+      diagTimers.current = gearSeq.map((g, i) => setTimeout(() => setDiagGear(g), i * 400));
+      diagTimers.current.push(setTimeout(() => {
         setDiag(false); setOn(true); setVirtualRpm(1500); setDiagSpeed(0);
+        diagSpeedInterval.current = null;
+        diagTimers.current = [];
         startTracking();
-              }, 2500);
+      }, 2500));
     }
   };
 
